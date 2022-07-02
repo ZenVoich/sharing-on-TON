@@ -1,0 +1,7 @@
+{
+  "type": "module",
+  "dependencies": {
+    "tonweb": "^0.0.50",
+    "ws": "^8.8.0"
+  }
+}
