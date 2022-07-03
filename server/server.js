@@ -23,9 +23,10 @@ const wss = new WebSocketServer({port: 8080});
 let sharing = new Sharing;
 let states = new Map; // hisPublicKey => state
 let channels = new Map; // hisPublicKey => channel
+let usedTokens = new Map; // hisPublicKey => tokenCount
 
-let minUserInitBalance = toNano('0.2');
-let maxUserInitBalance = toNano('2');
+let tokenPrice = toNano('0.01');
+let userInitBalance = toNano('0.1');
 
 let serializeState = (state) => {
 	return {
@@ -46,6 +47,30 @@ let deserializeState = (state) => {
 }
 
 wss.on('connection', (ws) => {
+	setInterval(() => {
+		ws.send(JSON.stringify({
+			type: 'info',
+			data: {
+				vehicles: sharing.vehicles,
+			},
+		}));
+	}, 1000);
+
+	let userId;
+	let channel;
+
+	let sendToken = (userId) => {
+		usedTokens.set(userId, (usedTokens.get(userId) || 0) + 1);
+
+		ws.send(JSON.stringify({
+			type: 'newToken',
+			data: {
+				token: String(Math.random() * 1_000_000 |0),
+			},
+		}));
+	}
+
+
 	ws.on('message', async (rawData) => {
 		try {
 			let msg = JSON.parse(rawData.toString());
@@ -62,7 +87,9 @@ wss.on('connection', (ws) => {
 					seqnoB: new BN(0),  // initially 0
 				};
 
-				states.set(msg.data.userPublicKey.toString(), state);
+				userId = msg.data.userPublicKey.toString();
+
+				states.set(userId, state);
 
 				// channel
 				let channelConfig = {
@@ -74,14 +101,14 @@ wss.on('connection', (ws) => {
 					initBalanceB: state.balanceB,
 				};
 
-				let channel = tonweb.payments.createChannel({
+				channel = tonweb.payments.createChannel({
 					...channelConfig,
 					isA: false,
 					myKeyPair: keyPair,
 					hisPublicKey: Uint8Array.from(msg.data.userPublicKey),
 				});
 
-				channels.set(msg.data.userPublicKey.toString(), channel);
+				channels.set(userId, channel);
 
 				// response
 				ws.send(JSON.stringify({
@@ -111,14 +138,90 @@ wss.on('connection', (ws) => {
 			}
 			// user starts driving
 			else if (msg.type === 'startDriving') {
-				msg.data.state
-				sharing.take(msg.data.vehicleId, );
+				let vehicle = sharing.take(msg.data.vehicleId, userId);
+				if (!vehicle) {
+					return;
+				}
+
+				let state = deserializeState(msg.data.state);
+				let signatureA = Uint8Array.from(msg.data.signature);
+
+				if (!(await channel.verifyState(state, signatureA))) {
+					console.error('startDriving: invalid signature');
+					return;
+				}
+				// ??
+				let signatureB = await channel.signState(state);
+				console.log('signed');
+
+				states.set(userId, state);
+
 				ws.send(JSON.stringify({
-					type: 'info',
+					type: 'drivingConfirmed',
 					data: {
-						vehicles: sharing.vehicles,
+						vehicle: vehicle,
 					},
 				}));
+				sendToken(userId);
+			}
+			else if (msg.type === 'pay') {
+				let state = deserializeState(msg.data.state);
+				let signatureA = Uint8Array.from(msg.data.signature);
+
+				// todo check userPublicKey
+				if (!(await channel.verifyState(state, signatureA))) {
+					console.error('pay: invalid signature');
+					return;
+				}
+
+				// check total pay is enough
+				let tokenCount = usedTokens.get(userId) || 0;
+				if ((tokenCount + 1) * tokenPrice < state.balanceB && state.balanceA >= 0) {
+					console.error('pay: not enough');
+					return;
+				}
+
+				states.set(userId, state);
+				sendToken(userId);
+			}
+			else if (msg.type === 'endDriving') {
+				let state = deserializeState(msg.data.state);
+				let signatureA = Uint8Array.from(msg.data.signature);
+
+				if (!(await channel.verifyState(state, signatureA))) {
+					console.error('end-driving: invalid signature');
+					return;
+				}
+
+				// check total pay is enough
+				let tokenCount = usedTokens.get(userId) || 0;
+				if ((tokenCount + 1) * tokenPrice < state.balanceB && state.balanceA >= 0) {
+					console.error('end-driving: not enough');
+					return;
+				}
+
+				// verify close
+				if (!(await channel.verifyClose(state, signatureA))) {
+					console.error('end-driving: invalid signature');
+					return;
+				}
+
+				let fromWallet = channel.fromWallet({
+					wallet: wallet,
+					secretKey: keyPair.secretKey,
+				});
+
+				await fromWallet.close({
+					...state,
+					hisSignature: signatureA,
+				}).send(toNano('0.05'));
+
+				// reset
+				states.delete(userId);
+				channels.delete(userId);
+				usedTokens.delete(userId);
+
+				console.log('channel closed')
 			}
 		}
 		catch (e) {

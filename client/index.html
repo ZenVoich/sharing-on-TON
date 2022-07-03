@@ -1,16 +1,73 @@
 <script src="./node_modules/tonweb/dist/tonweb.js" type="module"></script>
 <script src="./index.js" type="module"></script>
 
+<title>Carsharing Simulator on TON using Payment Channels</title>
+
 <body class="loading">
 	<div class="loader">
 		Loading...
 	</div>
 
-	<div class="title">Choose free vehicle!</div>
-	<div class="vehicles"></div>
+	<div class="main">
+		<div class="left">
+			<div class="parking">
+				<div class="title">Choose free vehicle!</div>
+				<div class="vehicles"></div>
+			</div>
+			<button id="end">End Driving</button>
+		</div>
+
+		<div class="driving-container">
+			<div class="driving-area"></div>
+		</div>
+	</div>
+
+	<div class="info-panel">
+		<div class="wallet">
+			<div class="title">Wallet</div>
+			<div id="wallet-address"></div>
+			<div class="detail">
+				<div class="label">Balance</div>
+				<div id="wallet-balance"></div>
+			</div>
+		</div>
+
+		<div class="channel">
+			<div class="title">Channel</div>
+			<div id="channel-address"></div>
+			<div class="detail">
+				<div class="label">Channel Open</div>
+				<div id="channel-open"></div>
+			</div>
+			<div class="detail">
+				<div class="label">User balance</div>
+				<div id="channel-balance-user"></div>
+			</div>
+			<div class="detail">
+				<div class="label">Server balance</div>
+				<div id="channel-balance-server"></div>
+			</div>
+		</div>
+
+		<div class="driving">
+			<div class="title">Driving</div>
+			<div class="detail">
+				<div class="label">Car id</div>
+				<div id="vehicle-id"></div>
+			</div>
+			<div class="detail">
+				<div class="label">Driving token</div>
+				<div id="vehicle-driving-token"></div>
+			</div>
+		</div>
+	</div>
 </body>
 
 <style>
+	body {
+		font-family: system-ui;
+	}
+
 	body:not(.loading) .loader {
 		display: none;
 	}
@@ -26,6 +83,41 @@
 		background-color: whitesmoke;
 	}
 
+	.main {
+		display: flex;
+		gap: 50px;
+		margin-bottom: 40px;
+	}
+
+	.left {
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+		flex-shrink: 0;
+	}
+
+	.info-panel {
+		display: flex;
+		gap: 20px;
+	}
+
+	.wallet, .channel, .driving {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		flex-grow: 1;
+		flex-basis: 0;
+	}
+
+	.detail {
+		display: flex;
+	}
+
+	.label {
+		min-width: 170px;
+	}
+
+	/* parking */
 	.title {
 		font-size: 20px;
 		font-family: Verdana, Geneva, Tahoma, sans-serif;
@@ -46,5 +138,15 @@
 	.vehicle.in-use {
 		filter: brightness(0.3);
 		pointer-events: none;
+	}
+
+	/* driving */
+	.driving-container {
+		border: 2px solid #69629f;
+	}
+
+	.driving-area {
+		width: 900px;
+		height: 600px;
 	}
 </style>

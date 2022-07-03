@@ -20,7 +20,12 @@ export let initWS = (client) => {
 		};
 	}
 
-	const ws = new WebSocket('ws://localhost:8080');
+	let ws = new WebSocket(localStorage.local ? 'ws://localhost:8080' : 'ws://172.14.51.12:8080');
+
+	ws.addEventListener('error', async (e) => {
+		document.body.classList.remove('loading');
+		document.body.prepend('ERR: WS is not connected!');
+	});
 
 	ws.addEventListener('open', async (e) => {
 		console.log('ws connected');
@@ -38,7 +43,7 @@ export let initWS = (client) => {
 	ws.addEventListener('message', async (e) => {
 		let msg = JSON.parse(e.data);
 
-		console.log('message', msg);
+		// console.log('message', msg);
 
 		if (msg.type === 'init') {
 			await client.init({
@@ -63,14 +68,29 @@ export let initWS = (client) => {
 		else if (msg.type === 'info') {
 			client.updateVehiclesInfo(msg.data);
 		}
+		else if (msg.type === 'drivingConfirmed') {
+			client.drivingConfirmed(msg.data);
+		}
 	});
 
-	client.on('start-driving', ({vehicleId}) => {
+	client.on('start-driving', ({vehicleId, state, signature}) => {
 		ws.send(JSON.stringify({
 			type: 'startDriving',
-			data: {
-				vehicleId: vehicleId,
-			},
+			data: {vehicleId, state, signature: Array.from(signature)},
 		}));
-	})
+	});
+
+	client.on('pay', ({vehicleId, state, signature}) => {
+		ws.send(JSON.stringify({
+			type: 'startDriving',
+			data: {vehicleId, state, signature: Array.from(signature)},
+		}));
+	});
+
+	client.on('end-driving', ({vehicleId, state, signature}) => {
+		ws.send(JSON.stringify({
+			type: 'endDriving',
+			data: {vehicleId, state, signature: Array.from(signature)},
+		}));
+	});
 }

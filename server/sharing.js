@@ -11,29 +11,37 @@ export class Sharing {
 	}
 
 	take(vehicleId, userId) {
-		let vehicle = vehicles.find((vehicle) => {
+		let vehicle = this.vehicles.find((vehicle) => {
 			return vehicle.id === vehicleId;
 		});
-		let userDriving = vehicles.find((vehicle) => {
+		let userDriving = this.vehicles.find((vehicle) => {
 			return vehicle.usingBy === userId;
 		});
 		if (vehicle && !vehicle.inUse && !userDriving) {
 			this.grantAccess(userId);
 			vehicle.take(userId);
+			return vehicle;
 		}
 	}
 
+	free(userId) {
+		let vehicle = this.vehicles.find((vehicle) => {
+			return vehicle.usingBy === userId;
+		});
+		vehicle?.free();
+	}
+
 	checkAccess(token, userId) {
-		userByToken.get(token) === userId;
+		this.userByToken.get(token) === userId;
 	}
 
 	grantAccess(userId) {
 		let token = this.generateToken();
-		userByToken.set(token, userId);
+		this.userByToken.set(token, userId);
 	}
 
 	revokeAccess(token) {
-		userByToken.delete(token);
+		this.userByToken.delete(token);
 	}
 
 	generateToken() {
