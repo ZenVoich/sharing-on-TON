@@ -1,2 +1,50 @@
-<script src="./node_modules/tonweb/dist/tonweb.js"></script>
-<script src="./client.js"></script>
+<script src="./node_modules/tonweb/dist/tonweb.js" type="module"></script>
+<script src="./client.js" type="module"></script>
+
+<body class="loading">
+	<div class="loader">
+		Loading...
+	</div>
+
+	<div class="title">Choose free vehicle!</div>
+	<div class="vehicles"></div>
+</body>
+
+<style>
+	body:not(.loading) .loader {
+		display: none;
+	}
+
+	.loader {
+		position: absolute;
+		inset: 0;
+		z-index: 10000;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 50px;
+		background-color: whitesmoke;
+	}
+
+	.title {
+		font-size: 20px;
+		font-family: Verdana, Geneva, Tahoma, sans-serif;
+		margin-bottom: 20px;
+	}
+
+	.vehicles {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.vehicle {
+		width: 100px;
+		cursor: pointer;
+	}
+
+	.vehicle.in-use {
+		filter: brightness(0.3);
+		pointer-events: none;
+	}
+</style>

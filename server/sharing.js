@@ -1,6 +1,6 @@
 import {Vehicle} from './vehicle.js';
 
-class Sharing {
+export class Sharing {
 	vehicles = [new Vehicle, new Vehicle, new Vehicle, new Vehicle, new Vehicle];
 	userByToken = new Map;
 
@@ -14,7 +14,10 @@ class Sharing {
 		let vehicle = vehicles.find((vehicle) => {
 			return vehicle.id === vehicleId;
 		});
-		if (vehicle && !vehicle.inUse) {
+		let userDriving = vehicles.find((vehicle) => {
+			return vehicle.usingBy === userId;
+		});
+		if (vehicle && !vehicle.inUse && !userDriving) {
 			this.grantAccess(userId);
 			vehicle.take(userId);
 		}
