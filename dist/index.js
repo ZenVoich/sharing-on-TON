@@ -659,6 +659,10 @@
 
   // client/index.js
   var client = new Client();
-  initWS(client);
-  initUI(client);
+  try {
+    initWS(client);
+  } catch {};
+  try {
+    initUI(client);
+  } catch {};
 })();
