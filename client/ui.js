@@ -1,28 +1,24 @@
-export let view = {
-	updateVehiclesInfo(vehicles) {
-		vehicles.forEach((vehicle) => {
-			document.body.classList.remove('loading');
+export let initUI = (client) => {
+	client.on('vehicles-update', () => {
+		document.body.classList.remove('loading');
 
+		client.vehicles.forEach((vehicle) => {
 			let html = `<div id="${vehicle.id}" class="vehicle ${vehicle.inUse ? 'in-use' : 'free'}"><img src="./img/yellow-car.svg"></div>`;
 			document.querySelector('.vehicles').insertAdjacentHTML('beforeend', html);
 
 			document.querySelector('.vehicles').onclick = (e) => {
 				let id = e.target.closest('.vehicle')?.id;
 				if (id) {
-					this.startDriving(id);
+					startDriving(id);
 				}
 			}
-		})
-	},
-	startDriving(vehicleId) {
+		});
+	});
+
+	let startDriving = (vehicleId) => {
 		document.querySelector(`[id="${vehicleId}"]`)?.classList.remove('free');
 		document.querySelector(`[id="${vehicleId}"]`)?.classList.add('in-use');
-		ws.send(JSON.stringify({
-			type: 'startDriving',
-			data: {
-				vehicleId: vehicleId,
-			},
-		}));
-		document.querySelector('.title').textContent = 'You are driving now! :)';
-	}
+		client.startDriving({vehicleId});
+		// document.querySelector('.title').textContent = 'You are driving now! :)';
+	};
 }

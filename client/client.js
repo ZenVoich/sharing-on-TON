@@ -1,4 +1,4 @@
-import {view} from './view.js';
+import {EventEmitter} from './event-emitter.js';
 
 const BN = TonWeb.utils.BN;
 const toNano = TonWeb.utils.toNano;
@@ -8,84 +8,39 @@ const apiKey = 'f089bfd4c3bf8c0e09658224622262223ec9a81683b13e08d9cf23fe546e54e5
 const tonweb = new TonWeb(new TonWeb.HttpProvider(providerUrl, {apiKey})); // Initialize TON SDK
 
 const seed = TonWeb.utils.base64ToBytes('SX2sNmZ9N70oAqEClONE0p7uMTd3bbvpmp0URbkyXoo=');
-const keyPair = tonweb.utils.keyPairFromSeed(seed);
-const wallet = tonweb.wallet.create({
-	publicKey: keyPair.publicKey
-});
 
-let serializeState = (state) => {
-	return {
-		balanceA: state.balanceA.toString(),
-		balanceB: state.balanceB.toString(),
-		seqnoA: state.seqnoA.toString(),
-		seqnoB: state.seqnoB.toString(),
-	};
-}
+export class Client extends EventEmitter {
+	initBalance = toNano('0.01');
+	keyPair = tonweb.utils.keyPairFromSeed(seed);
+	wallet = tonweb.wallet.create({publicKey: this.keyPair.publicKey});
 
-let deserializeState = (state) => {
-	return {
-		balanceA: new BN(state.balanceA),
-		balanceB: new BN(state.balanceB),
-		seqnoA: new BN(state.seqnoA),
-		seqnoB: new BN(state.seqnoB),
-	};
-}
+	channel;
+	state;
+	walletAddress;
+	fromWallet;
 
-const ws = new WebSocket('ws://localhost:8080');
-window.ws = ws;
+	async init({channelConfig, state}) {
+		this.walletAddress = await this.wallet.getAddress();
 
-let initBalance = toNano('0.01');
+		console.log('client wallet', this.walletAddress.toString(true, true, true))
 
-ws.addEventListener('open', async (e) => {
-	console.log('connected');
-	console.log('wallet', (await wallet.getAddress()).toString(true, true, true))
-
-	ws.send(JSON.stringify({
-		type: 'requestInit',
-		data: {
-			userAddress: (await wallet.getAddress()).toString(true, true, true),
-			initUserBalance: initBalance.toString(),
-			userPublicKey: Array.from(keyPair.publicKey),
-		},
-	}));
-});
-
-let channel;
-let state;
-let fromWallet;
-
-ws.addEventListener('message', async (e) => {
-	let msg = JSON.parse(e.data);
-
-	console.log('message', msg);
-
-	if (msg.type === 'init') {
 		// 1. create channel
-		channel = tonweb.payments.createChannel({
-			...msg.data.channelConfig,
-			channelId: new BN(msg.data.channelConfig.channelId),
-			addressA: new TonWeb.Address(msg.data.channelConfig.addressA),
-			addressB: new TonWeb.Address(msg.data.channelConfig.addressB),
-			initBalanceA: new BN(msg.data.channelConfig.initBalanceA),
-			initBalanceB: new BN(msg.data.channelConfig.initBalanceB),
-			isA: true,
-			myKeyPair: keyPair,
-			hisPublicKey: Uint8Array.from(msg.data.serverPublicKey),
-		});
-		state = deserializeState(msg.data.state);
+		this.channel = tonweb.payments.createChannel(channelConfig);
 
-		fromWallet = channel.fromWallet({
-			wallet: wallet,
-			secretKey: keyPair.secretKey,
+		this.state = state;
+
+		this.fromWallet = this.channel.fromWallet({
+			wallet: this.wallet,
+			secretKey: this.keyPair.secretKey,
 		});
 
-		const channelAddress = await channel.getAddress(); // address of this payment channel smart-contract in blockchain
+		const channelAddress = await this.channel.getAddress(); // address of this payment channel smart-contract in blockchain
 		console.log('channelAddress', channelAddress.toString(true, true, true));
-		console.log('channel', channel);
-		console.log('state', state);
+		console.log('channel', this.channel);
+		console.log('state', this.state);
 
 		// 2. deploy channel
-		// await fromWallet.deploy().send(toNano('0.05'));
+		// await this.fromWallet.fromWallet.deploy().send(toNano('0.05'));
 
 		// wait for deploy
 		// previous `await deploy()` doesn't guarantee that channel has been deployed
@@ -93,7 +48,7 @@ ws.addEventListener('message', async (e) => {
 			return new Promise((resolve) => {
 				let checkDeploy = async () => {
 					try {
-						await channel.getChannelState();
+						await this.channel.getChannelState();
 					}
 					catch {
 						setTimeout(checkDeploy, 2000);
@@ -109,16 +64,16 @@ ws.addEventListener('message', async (e) => {
 		await waitForDeploy();
 
 		// 3. top up initial balance
-		// await fromWallet
-		// 	.topUp({coinsA: initBalance, coinsB: new BN(0)})
-		// 	.send(initBalance.add(toNano('0.05'))); // +0.05 TON to network fees
+		// await this.fromWallet.fromWallet
+		// 	.topUp({coinsA: this.initBalance, coinsB: new BN(0)})
+		// 	.send(this.initBalance.add(toNano('0.05'))); // +0.05 TON to network fees
 
 		// wait for top up
 		let waitForTopUp = () => {
 			return new Promise((resolve) => {
 				let checkBalance = async () => {
-					let data = await channel.getData();
-					if (data.balanceA.toNumber() >= initBalance.toNumber()) {
+					let data = await this.channel.getData();
+					if (data.balanceA.toNumber() >= this.initBalance.toNumber()) {
 						resolve();
 						console.log('topped up');
 						console.log('balanceA =', data.balanceA.toString());
@@ -135,13 +90,13 @@ ws.addEventListener('message', async (e) => {
 		await waitForTopUp();
 
 		// 4. init channel
-		// await fromWallet.init(state).send(toNano('0.05'));
+		// await this.fromWallet.fromWallet.init(this.state).send(toNano('0.05'));
 
 		// wait for init/open
 		let waitForOpen = () => {
 			return new Promise((resolve) => {
 				let checkOpen = async () => {
-					if (await channel.getChannelState() === TonWeb.payments.PaymentChannel.STATE_OPEN) {
+					if (await this.channel.getChannelState() === TonWeb.payments.PaymentChannel.STATE_OPEN) {
 						resolve();
 						console.log('channel is open');
 					}
@@ -155,11 +110,15 @@ ws.addEventListener('message', async (e) => {
 		};
 		await waitForOpen();
 
-		ws.send(JSON.stringify({
-			type: 'ready',
-		}));
+		this.emit('init');
 	}
-	else if (msg.type === 'info') {
-		view.updateVehiclesInfo(msg.data.vehicles);
+
+	updateVehiclesInfo({vehicles}) {
+		this.vehicles = vehicles;
+		this.emit('vehicles-update');
 	}
-});
+
+	startDriving({vehicleId}) {
+		this.emit('start-driving', {vehicleId});
+	}
+}
