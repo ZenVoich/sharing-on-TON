@@ -588,10 +588,17 @@
         seqnoB: new BN2(state.seqnoB)
       };
     };
-    let ws = new WebSocket(localStorage.local ? "ws://localhost:8080" : "ws://172.14.51.12:8080");
+    let ws;
+    try {
+      ws = new WebSocket(localStorage.local ? "wss://localhost:8080" : "ws://172.14.51.12:8080");
+    }
+    catch {
+      document.body.classList.remove("loading");
+      document.body.prepend("ERR: WebSocket is not connected!");
+    }
     ws.addEventListener("error", async (e) => {
       document.body.classList.remove("loading");
-      document.body.prepend("ERR: WS is not connected!");
+      document.body.prepend("ERR: WebSocket is not connected!");
     });
     ws.addEventListener("open", async (e) => {
       console.log("ws connected");
